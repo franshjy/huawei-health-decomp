@@ -1,15 +1,17 @@
 ﻿# huawei-health-decomp
 
 Repackaging notes and patch scripts for **Huawei Health** (`com.huawei.health`),
-`versionCode 1700008300` / `versionName 17.0.8.300`.
+`versionCode 1700008300` / `versionName 17.0.8.300`. Purpose of this repo is to:
+1. Strip analytics, bloat, and other data transportation methods to Huawei's servers
+2. Allow pairing and other functionalities without logging in.
 
-Goal: pair a **Huawei Watch GT 2** on a non-Huawei phone, with **no Huawei ID account**,
-without root and without an emulator. Secondary: remove analytics reporting.
 
-**This repository contains no APKs and no signing key.** Bring your own APK; make your
-own keystore.
+Repo was tested on a  **Huawei Watch GT 2** on a non-Huawei phone, without account, without root, and without an emulator.
 
-## What the patches do
+**THIS REPOSITORY DOES NOT PROVIDE APKS NOR SIGNING KEYS** 
+You can download the official Huawei Health APK from their website or their app store.
+
+## Patches
 
 | # | Script | Effect |
 |---|---|---|
@@ -23,7 +25,7 @@ own keystore.
 | 07 | `patches/07_dfx.py` | 11 DFX / CrowdTest methods across 5 classes. |
 | 08 | `patches/08_loguploadworker.py` | `LogUploadWorker.doWork()` → `Result.success()`. This is the only real DFX upload egress. |
 
-## Why 04 is enough for the account gate
+## Login Bypass (04)
 
 The Huawei ID requirement is entirely app-level, not protocol-level. `LoginInit.isBrowseMode()`
 is literally `!getIsLogined()`, so forcing that one boolean opens every browse-mode gate
@@ -32,16 +34,15 @@ is literally `!getIsLogined()`, so forcing that one boolean opens every browse-m
 `doCreateBond()`) never consults an account; device discovery is
 `getConnectedDevices(7)` / `getBondedDevices()`.
 
-## Why 06 and 08 are the telemetry patches that matter
+## Telemetry (06 & 08)
 
-There are **three** separate HiAnalytics implementations in this APK. Patching the network-kit
+There are three separate HiAnalytics implementations in this APK. Patching the network-kit
 and `hatool` copies (05) silences two of them and looks successful at boot, but the live one is
-`com.huawei.hianalytics.a0`, and feature analytics instantiates lazily on first use — e.g.
-opening the watchface picker.
+`com.huawei.hianalytics.a0`, and feature analytics instantiates lazily on first use.
 
-Likewise, the DFX pipeline builds a `OneTimeWorkRequest` and hands it to WorkManager. The job
+The DFX pipeline builds a `OneTimeWorkRequest` and hands it to WorkManager. The job
 survives process death and retries on WiFi, so patching the callers (07) is not sufficient on
-its own; 08 makes the worker inert.
+its own, 08 makes the worker inert.
 
 A boot-time measurement proves nothing for either. Verify by exercising the UI and counting
 `RecordTask==> record evt` (should be 0) and `WM-WorkerWrapper: Worker result SUCCESS` (should
@@ -81,10 +82,9 @@ obfuscation mapping. The patches verify their targets as they run and fail loudl
 `-r` during decode is required: it keeps `resources.arsc` raw and `AndroidManifest.xml` as
 binary AXML. That is why nothing here edits the manifest.
 
-## Signing, and the consequences
+## Signing
 
-You must sign with your own key. This breaks the app's self-signature check — which is exactly
-why patch 01 exists, and why the original build cannot be installed over an official one.
+You must sign with your own key. The patched build cannot be installed over an official one.
 
 Practically, on Xiaomi/MIUI:
 
@@ -103,27 +103,6 @@ adb shell pm grant com.huawei.health android.permission.ACCESS_BACKGROUND_LOCATI
 Without it, the weather-report toggle silently reverts to off: the push is issued from
 `:PhoneService`, a background process, and gets dropped without a location fix.
 
-## Troubleshooting: the app exits by itself
-
-If the app opens and then vanishes 15–20 seconds later with **no crash, no FATAL, no
-tombstone, and nothing in logcat's crash buffer**, that is not a crash — it is a clean
-`exit(0)`, almost certainly patch 00 not being applied.
-
-```
-adb shell dumpsys activity exit-info com.huawei.health
-```
-
-Look for `reason=1 (EXIT_SELF)`. In logcat you will see:
-
-```
-I/R_SecurityChecker: [C++] Log helper set successfully
-W/R_SecurityChecker: wrong App: java
-I/m.huawei.health: System.exit called, status: 0
-I/Zygote: Process 12345 exited cleanly (0)
-```
-
-A 30-second "is it alive?" check is **not** a boot test — it exits around 19 s, so an early
-sample can read as healthy. Check again after at least 60 s.
 
 ## Known limits
 
@@ -133,6 +112,7 @@ sample can read as healthy. Check again after at least 60 s.
 - CrowdTest feedback UI is no-op'd, not removed.
 - Patches are specific to `versionCode 1700008300`. Other builds need re-analysis, not just
   re-running these scripts.
+- Watchfaces aren't available without logging in.
 
 ## Not included
 
