@@ -1,0 +1,39 @@
+﻿# Build outputs: APKs exceed GitHub's per-file limit and are redistribution of
+# Huawei's proprietary app. Reproducible from apply_all.py + your own base APK.
+*.apk
+*.idsig
+*.apk.idsig
+
+# Signing material. Never commit: whoever holds it can sign an APK a device will
+# accept as an update to an existing install.
+*.keystore
+*.jks
+*.p12
+
+# apktool working tree (104k files, ~1.4 GB). Regenerate with apply_all.py.
+hh_decoded/
+
+# Logcat captures (hundreds of MB each) and crash dumps.
+pair_test*.log
+hs_err_pid*.log
+replay_pid*.log
+aot_compile.log
+apktool_*.log
+
+# Device screenshots and unrelated tooling config.
+shot*.png
+rea_*.json
+
+# Local scratch used while validating patch scripts.
+_test/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
