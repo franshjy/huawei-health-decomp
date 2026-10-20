@@ -13,10 +13,11 @@ own keystore.
 
 | # | Script | Effect |
 |---|---|---|
+| 00 | `patches/00_securitychecker.py` | `SecurityChecker.e()` → `false`. Disables the self-signature check. **Required** — without it the app calls `System.exit(0)` ~19 s after launch, with no crash, no tombstone and nothing in logcat's crash buffer. |
 | 01 | `patches/01_whitebox.py` | Native `.so`: forces the auth gate in `executeAuth` onto its success path. Without it, startup ANRs with `StringIndexOutOfBoundsException` in `createNewSecureKey`. |
 | 02 | `patches/02_telemetry.py` | 19 analytics methods in `OpAnalyticsUtil` / `OpAnalyticsImpl` / `ReportTask` → no-op. |
 | 03 | `patches/03_bloat.py` | 9 methods: DFX monitor centre, `DownloadFileProvider`, `PPSECProvider`, config + A/B registrars. |
-| 04 | `patches/04_login.py` | `SharedPreferenceUtil.getIsLogined()` → `true`. Removes the Huawei ID requirement. |
+| 04 | `patches/04_login.py` | `SharedPreferenceUtil.getIsLogined()` → `true`, plus `LoginInit.browsingToLogin(...)` → reports code 0. Removes the Huawei ID requirement. |
 | 05 | `patches/05_hatool.py` | 5 methods in the network-kit HiAnalytics and `hatool` task queue. |
 | 06 | `patches/06_hianalytics.py` | All 20 entry points of `com.huawei.hianalytics.a0` (the real `HiAnalyticsInstance`). |
 | 07 | `patches/07_dfx.py` | 11 DFX / CrowdTest methods across 5 classes. |
@@ -53,7 +54,7 @@ python apply_all.py --apk com.huawei.health.1700008300.apk \
                     --keystore my.keystore --ks-pass pass:secret
 ```
 
-That decodes (`apktool d -r`), applies patches 01–08, rebuilds, aligns and signs.
+That decodes (`apktool d -r`), applies patches 00-08, rebuilds, aligns and signs.
 
 `--preflight-only` checks the base APK and exits without decoding.
 
@@ -101,6 +102,28 @@ adb shell pm grant com.huawei.health android.permission.ACCESS_BACKGROUND_LOCATI
 
 Without it, the weather-report toggle silently reverts to off: the push is issued from
 `:PhoneService`, a background process, and gets dropped without a location fix.
+
+## Troubleshooting: the app exits by itself
+
+If the app opens and then vanishes 15–20 seconds later with **no crash, no FATAL, no
+tombstone, and nothing in logcat's crash buffer**, that is not a crash — it is a clean
+`exit(0)`, almost certainly patch 00 not being applied.
+
+```
+adb shell dumpsys activity exit-info com.huawei.health
+```
+
+Look for `reason=1 (EXIT_SELF)`. In logcat you will see:
+
+```
+I/R_SecurityChecker: [C++] Log helper set successfully
+W/R_SecurityChecker: wrong App: java
+I/m.huawei.health: System.exit called, status: 0
+I/Zygote: Process 12345 exited cleanly (0)
+```
+
+A 30-second "is it alive?" check is **not** a boot test — it exits around 19 s, so an early
+sample can read as healthy. Check again after at least 60 s.
 
 ## Known limits
 

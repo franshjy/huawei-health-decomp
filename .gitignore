@@ -15,6 +15,8 @@ hh_decoded/
 
 # Logcat captures (hundreds of MB each) and crash dumps.
 pair_test*.log
+fast_test*.log
+*_test*.log
 hs_err_pid*.log
 replay_pid*.log
 aot_compile.log
@@ -26,6 +28,9 @@ rea_*.json
 
 # Local scratch used while validating patch scripts.
 _test/
+_mini/
+unsigned.apk
+hh_fast.apk
 
 # Python
 .venv/

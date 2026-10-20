@@ -1,7 +1,15 @@
 import os, sys
+
+
 def _root():
     """Work dir (the apktool decode). argv[1] or $HH_ROOT, default ./hh_decoded."""
-    return os.environ.get("HH_ROOT") or (sys.argv[1] if len(sys.argv) > 1 else "hh_decoded")
+    return os.environ.get("HH_ROOT") or (
+        sys.argv[1] if len(sys.argv) > 1 else "hh_decoded"
+    )
+
+
+import re
+
 
 import shutil
 
@@ -86,9 +94,13 @@ for rel, sig, label in TARGETS:
     nl = "\r\n" if "\r\n" in text else "\n"
     lines = text.split(nl)
 
-    hits = [
-        i for i, l in enumerate(lines) if l.strip().startswith(".method") and sig in l
-    ]
+    # Match the declaration itself. A bare `sig in l` also matches `uninit(...)`
+    # for the signature `init(...)`, which silently double-counts.
+    decl = re.compile(
+        r"\.method\s+(?:public |private |protected |static |final |synthetic )*"
+        + re.escape(sig)
+    )
+    hits = [i for i, l in enumerate(lines) if decl.search(l)]
     if len(hits) != 1:
         fail.append((label, "%d matches" % len(hits)))
         continue
@@ -124,7 +136,7 @@ total = 0
 for rel, sig, label in TARGETS:
     path = os.path.join(BASE, rel)
     t = open(path, encoding="utf-8").read()
-    n = t.count("PATCH(hh8): " + label)
+    n = t.count("PATCH(hh8): " + label + " disabled")
     total += n
     print("  %-32s %s" % (label, "OK" if n == 1 else "MISSING(%d)" % n))
 print("markers total:", total)

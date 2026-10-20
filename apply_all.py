@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One command: decode -> apply patches 01..08 -> build -> zipalign -> sign.
+"""One command: decode -> apply patches 00..08 -> build -> zipalign -> sign.
 
     python apply_all.py --apk com.huawei.health.2609241423.apk \
                         --keystore my.keystore --ks-pass pass:secret
@@ -31,6 +31,7 @@ REF_SHA256 = "6E693FE6051B69FEFA68215CE52D1F3AE4A2A7C8E25D09B034C73C20BF6F42FD"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATCHES = [
+    "00_securitychecker.py",
     "01_whitebox.py",
     "02_telemetry.py",
     "03_bloat.py",
@@ -79,6 +80,12 @@ def build_tools_dir():
 
 
 def run(cmd, cwd=None):
+    cmd = [str(c) for c in cmd]
+    exe = shutil.which(cmd[0]) or cmd[0]
+    cmd[0] = exe
+    # Windows cannot CreateProcess a .bat/.cmd directly (apktool ships as apktool.bat).
+    if os.name == "nt" and exe.lower().endswith((".bat", ".cmd")):
+        cmd = ["cmd", "/c"] + cmd
     shown = " ".join(str(c) for c in cmd)
     print("\n$ " + shown)
     # stdin=DEVNULL matters on Windows: apktool.bat ends in `pause`.
@@ -196,7 +203,7 @@ def main():
     preflight(args.apk, aapt2, args.force)
 
     if args.preflight_only:
-        print("\npreflight OK (-r decode, patches 01..08, build, sign)")
+        print("\npreflight OK (-r decode, patches 00..08, build, sign)")
         return
 
     if os.path.isdir(args.work) and os.listdir(args.work):
